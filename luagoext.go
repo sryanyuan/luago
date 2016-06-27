@@ -11,6 +11,7 @@ package luago
 import "C"
 
 import (
+	"errors"
 	"fmt"
 	"unsafe"
 )
@@ -74,18 +75,17 @@ func (this *LuaGo_State) LuaGo_PopGoFunction(_name string) {
 	C.free(unsafe.Pointer(cfuncname))
 }
 
-func (this *LuaGo_State) LuaGo_SafeDoFile(_name string) bool {
+func (this *LuaGo_State) LuaGo_SafeDoFile(_name string) error {
 	if R := LuaL_loadfile(this.handle, _name); LUA_OK != R {
 		err_msg := Lua_tostring(this.handle, -1)
 		Lua_pop(this.handle, 1)
-		fmt.Print(err_msg)
-		return false
+		return errors.New(err_msg)
 	}
 
 	//this.luago_pushErrorCallback()
 	//return this.luago_safeDoFile()
 	this.LuaGo_SafeCall(0, true)
-	return true
+	return nil
 }
 
 func (this *LuaGo_State) luago_pushErrorCallback() {
@@ -100,13 +100,12 @@ func (this *LuaGo_State) luago_pushErrorCallback() {
 
 //	只支持返回单返回值:number or boolean , 其余自己操作lua_state获取
 //	removeret : 自动pop返回值，假设返回值个数为0，传入false
-func (this *LuaGo_State) LuaGo_SafeCall(argnum int, removeret bool) int {
+func (this *LuaGo_State) LuaGo_SafeCall(argnum int, removeret bool) (int, error) {
 	var funcIndex int = -(argnum + 1)
 	if !Lua_isfunction(this.handle, funcIndex) {
 		//	pop all arguments and the calling function
 		Lua_pop(this.handle, argnum+1)
-		fmt.Print("trying to call a non-callable object")
-		return 0
+		return 0, errors.New("Trying to call a non-callable object")
 	}
 
 	var traceback int = 0
@@ -127,14 +126,14 @@ func (this *LuaGo_State) LuaGo_SafeCall(argnum int, removeret bool) int {
 			//	没有指定错误回调
 			err_msg = Lua_tostring(this.handle, -1)
 			Lua_pop(this.handle, 1)
-			fmt.Print("[LUA ERROR] ", err_msg)
 		} else {
 			//	指定了错误回调
 			//	before call stack: traceback function
 			//	after call with error stack: trackback errmsg
 			Lua_pop(this.handle, 2)
+			err_msg = "call error"
 		}
-		return 0
+		return 0, errors.New(err_msg)
 	}
 
 	var ret int = 0
@@ -161,7 +160,7 @@ func (this *LuaGo_State) LuaGo_SafeCall(argnum int, removeret bool) int {
 		Lua_remove(this.handle, removeStackIndex)
 	}
 
-	return ret
+	return ret, nil
 }
 
 func (this *LuaGo_State) luago_safeDoFile() (bool, string) {
