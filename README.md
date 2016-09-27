@@ -42,3 +42,7 @@ This project implement a wrapper for lua 5.2.2 using cgo.It just export almost a
 			print(val)
 		`)
 	}
+
+# license
+
+MIT
